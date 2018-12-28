@@ -1,0 +1,253 @@
+version: '1.0'
+
+behaviors:
+  - name: "Alert when Armed"
+    description: "Burglar alert with debounce when area armed"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      holdon: 1s
+    conditions:
+      - "stateof(configuration(trigger).area).armed is true"
+    commands:
+      - wait.core:
+          duration: 10s
+      - alert.generate:
+          type: "Burglar"
+            
+  - name: "Alert"
+    description: "Burglar alert regardless of Arm mode"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      holdon: 1s
+    commands:
+      - alert.generate:
+          type: "Burglar"
+  
+  - name: "Tamper Alert"
+    description: "Tamper alert when outside valid resistances"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+    trigger:
+      event: "input.tamper"
+      point: "{point}"
+      holdon: 1s
+    commands:
+      - alert.generate:
+          type: "Tamper"
+          
+  - name: "Masked Alert"
+    description: "Masked alert when anti-masking triggered"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+    trigger:
+      event: "input.masked"
+      point: "{point}"
+      holdon: 1s
+    commands:
+      - alert.generate:
+          type: "Masked"
+
+  - name: "REX"
+    description: "Input available as REX (Request to Exit/Egress) button"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      holdon: 1s
+    commands:
+      - door.access:
+          point: {target}
+          
+  - name: "REX with Schedule"
+    description: "Input available as REX button according to a schedule"
+    restrictions: # Only valid for inputs
+        section: inputs
+    parameters:
+      - point: ref
+      - target: ref
+      - schedule: ref
+    conditions:
+      - "stateof({schedule}).active is true"
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      holdon: 1s
+    commands:
+      - door.access:
+          point: {target}
+          
+  - name: "Activate Output on Input"
+    description: "Turn on an output"
+    restrictions: # Behavior can only be used on this service & point combination
+        service: pi_onboard
+        section: inputs
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      holdon: 1s
+    conditions:
+      - "stateof({target}).command is false"  # The light mode has not been changed by command
+    commands:
+      - output.activate:
+          point: "{target}"
+          
+  - name: "Deactivate Output on Input"
+    description: "Turn off an output"
+    restrictions:
+        service: pi_onboard
+        section: inputs
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "input.active"
+      point: "{point}"
+      value: 0
+      holdon: 1s
+    conditions:
+      - "stateof({target}).command is false"  # The light mode has not been changed by command
+    commands:
+      - output.activate:
+          point: "{target}"
+          
+  - name: "Activate Output on Alert"
+    description: "Turn on an output"
+    restrictions:
+        section: alerts
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "alert.active"
+      point: "{point}"
+      holdon: 1s
+    conditions:
+      - "stateof({target}).command is false"  # The light mode has not been changed by command
+    commands:
+      - output.activate:
+          point: "{target}"
+          
+  - name: "Deactivate Output on Alert"
+    description: "Turn off an output"
+    restrictions: # Behavior can only be used on this service & point combination
+        section: alerts
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "alert.active"
+      point: "{point}"
+      value: 0
+      holdon: 1s
+    conditions:
+      - "stateof({target}).command is false"  # The light mode has not been changed by command
+    commands:
+      - output.activate:
+          point: "{target}"
+
+        
+  - name: "Activate on Schedule"
+    description: "Turn on lights according to a schedule"
+    restrictions: # Behavior can only be used on this service & point combination
+        service: pi_onboard
+        section: outputs
+    parameters:
+      - point: ref
+      - schedule: ref
+    conditions:
+      - "stateof({schedule}).active is true" # Turn lights on according to a schedule
+      - "stateof({point}).command is false"  # The light mode has not been changed by command
+    commands:
+      - output.activate:
+          point: "{point}"
+          
+  - name: "Arm on Schedule"
+    description: "Arm area according to a schedule"
+    restrictions: # Behavior can only be used on this service & point combination
+        section: areas
+    parameters:
+      - point: ref
+      - schedule: ref
+    conditions:
+      - "stateof({schedule}).active is true" # Turn lights on according to a schedule
+      - "stateof({point}).command is false"  # The light mode has not been changed by command
+    commands:
+      - area.arm:
+          point: "{point}"
+                   
+  - name: "Alert on Offline"
+    description: "Create alert when offline"
+    restrictions:
+        section: devices
+    parameters:
+      - point: ref
+    trigger:
+      event: "device.offline"
+      point: "{point}"
+      holdon: 1m
+    commands:
+      - alert.generate:
+          type: "Communication"
+          
+  - name: "Record on Alert"
+    description: "Start recording on input activate"
+    restrictions:
+        section: alerts
+    parameters:
+      - point: ref
+      - target: ref
+    trigger:
+      event: "alert.active"
+      point: "{point}"
+    commands:
+      - camera.record:
+          point: "{target}"
+          duration: 1m
+          
+  - name: "Record on Motion"
+    description: "Start recording on motion detect"
+    restrictions:
+        section: cameras
+    parameters:
+      - point: ref
+    trigger:
+      event: "camera.motion"
+      point: "{point}"
+    commands:
+      - camera.record:
+          point: "{point}"
+          duration: 1m
+          
+  - name: "Grant Access to Door"
+    description: "When a valid card is swipe a door opens"
+    restrictions:
+        section: readers
+    parameters:
+      - reader_name: ref
+    trigger:
+      event: "reader.cardswipe"
+      point: "{reader_name}"
+    commands:
+      - door.singleaccess:
+            result: "{haspermission(trigger.user, configuration(trigger).door)}"
